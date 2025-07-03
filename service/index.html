@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Servicio de Validación</title>
+</head>
+<body>
+  <h1>Verificando...</h1>
+  <script>
+    const EXTERNAL_CLIENT_ORIGIN = 'http://127.0.0.1:5500';
+
+    function normalizeUrl(url) {
+      if (/^https?:\/\//i.test(url)) return url;
+      if (/\.\w{2,}$/.test(url)) return 'http://' + url;
+      return url;
+    }
+
+    function isValidUrlSchema(url) {
+      try {
+        new URL(url);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function validateUrlExternally(url) {
+      try {
+        const response = await fetch(url, { mode: 'no-cors' });
+        return {
+          status: true,
+          response: `Response { type: ${response.type}, url: ${response.url}, redirected: ${response.redirected}, status: ${response.status}, ok: ${response.ok} }`,
+        };
+      } catch (error) {
+        return { status: false, response: error.stack || error.toString() };
+      }
+    }
+
+    window.addEventListener('message', async function (event) {
+      if (event.origin !== EXTERNAL_CLIENT_ORIGIN) return;
+
+      if (event.data.type === 'validate-url') {
+        const rawUrl = event.data.url;
+        const url = normalizeUrl(rawUrl);
+
+        let result;
+        if (!isValidUrlSchema(url)) {
+          result = { status: false, response: 'URL inválida' };
+        } else {
+          result = await validateUrlExternally(url);
+        }
+
+        event.source.postMessage({ type: 'validation-result', result }, event.origin);
+      }
+    });
+  </script>
+</body>
+</html>
